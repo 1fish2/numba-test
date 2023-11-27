@@ -1,3 +1,7 @@
+# pyenv virtualenv 3.9.0 numba-test-3.9.0
+# pyenv local !$
+# pip install -U -r requirements.txt
+
 pip
 setuptools
 wheel
