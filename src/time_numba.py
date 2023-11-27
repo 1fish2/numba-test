@@ -3,6 +3,8 @@ import timeit
 from numba import njit
 import numpy as np
 
+NUMBER = 10_000  # number of times for timeit to run the timed code
+
 # From TwoComponentSystem.
 # The matrix has free_symbols: y[0] .. y[40].
 SYMBOLIC_RATES = """lambda t, y: np.array([ \
@@ -16,6 +18,7 @@ SYMBOLIC_RATES = """lambda t, y: np.array([ \
     [500.0*y[38]*y[4]], [100000000.0*y[37]*y[40]], [0.01*y[39]*y[8]]]).reshape(-1) \
     """
 
+# From TwoComponentSystem.
 # The matrix has free_symbols: y[0] .. y[40].
 SYMBOLIC_RATES_JACOBIAN = """lambda t, y: np.array([ \
     [0, 0, 0, 500.0*y[4], 500.0*y[3], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
@@ -88,11 +91,13 @@ def time_jitter(function_name, function_code):
     f = eval(function_code, {'np': np}, {})
     f_jit = njit(f, error_model='numpy')
 
-    time = timeit.timeit(lambda: f(t, y), number=1000)
+    time = timeit.timeit(lambda: f(t, y), number=NUMBER)
 
     time_to_jit = timeit.timeit(lambda: f_jit(t, y), number=1)  # 1st time will JIT f_jit
-    time_jitted = timeit.timeit(lambda: f_jit(t, y), number=1000)
-    print(f"{function_name}: 1000x {time=}, 1x {time_to_jit=}, 1000x {time_jitted=}")
+    time_jitted = timeit.timeit(lambda: f_jit(t, y), number=NUMBER)
+    print(f"{function_name}: {time / NUMBER * 1000.0} ms,"
+          f" jitting {time_to_jit * 1000.0} ms,"
+          f" jitted {time_jitted / NUMBER * 1000.0} ms")
 
 
 def time_symbolic_rates():
