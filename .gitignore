@@ -1,0 +1,16 @@
+.python-version
+
+*.pyc
+__pycache__
+
+.DS_Store
+._*
+
+# Cython + clang outputs
+*.c
+*.html
+*.so
+*.o
+
+.idea/
+.vscode/
