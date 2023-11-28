@@ -306,13 +306,16 @@ def time_jit(function_name, function_code):
     f = eval(function_code, {'np': np}, {})
     f_jit = njit(f, error_model='numpy')
 
-    time = timeit.timeit(lambda: f(t, y, kf, kr), number=NUMBER)
+    time = timeit.timeit(lambda: f(t, y, kf, kr), number=NUMBER) / NUMBER
 
     time_to_jit = timeit.timeit(lambda: f_jit(t, y, kf, kr), number=1)  # 1st time JITs
-    time_jitted = timeit.timeit(lambda: f_jit(t, y, kf, kr), number=NUMBER)
-    print(f"{function_name}: {time / NUMBER * 1000.0} ms,"
+    time_jitted = timeit.timeit(lambda: f_jit(t, y, kf, kr), number=NUMBER) / NUMBER
+
+    iterations_to_payoff = time_to_jit / (time - time_jitted)  # for JITted function
+    print(f"{function_name:27} {time * 1000.0} ms,"
           f" jitting {time_to_jit * 1000.0:,} ms,"
-          f" jitted {time_jitted / NUMBER * 1000.0} ms")
+          f" jitted {time_jitted * 1000.0} ms,"
+          f" iterations to payoff {iterations_to_payoff:,.0f}")
 
 
 def time_symbolic_rates():
