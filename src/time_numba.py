@@ -296,6 +296,13 @@ EQUILIBRIUM_RATES_JACOBIAN = """lambda t, y, kf, kr: np.array([ \
      0, -kr[36], kf[36] * y[103], kf[36] * y[102]]]).reshape(-1) \
     """
 
+@njit
+def builder(dims, *entries):
+    a = np.zeros(dims, float)
+    for i, j, e in entries:
+        a[i, j] = e
+    return a.reshape(-1)
+
 
 def time_jit(function_name, function_code):
     """Time how long it takes to run the function code, to JIT compile it, and
@@ -307,7 +314,7 @@ def time_jit(function_name, function_code):
     kr = np.arange(100.0) * 10
 
     if isinstance(function_code, str):
-        f = eval(function_code, {'np': np}, {})
+        f = eval(function_code, {'np': np, 'builder': builder}, {})
     else:
         f = function_code
     f_jit = njit(f, error_model='numpy')
@@ -324,7 +331,38 @@ def time_jit(function_name, function_code):
           f" iterations to payoff {iterations_to_payoff:,.0f}")
 
 
+def refactor_to_lambda(func_string, arr_dims, sparse=False):
+    array_string = func_string[36:-19]
+    arr_vals = array_string.split(',')
+    f_template = f"lambda t, y, kf, kr: builder({arr_dims}, "
+    row_idx = -1
+    col_idx = 0
+    for arr_val in arr_vals:
+        col_idx += 1
+        clean_val = arr_val.strip()
+        if clean_val.startswith('['):
+            row_idx += 1
+            col_idx = 0
+            clean_val = clean_val[1:]
+        if clean_val.endswith(']]'):
+            clean_val = clean_val[:-1]
+        if clean_val.endswith(']]'):
+            clean_val = clean_val[:-1]
+        if clean_val == '0]':
+            clean_val = clean_val[:-1]
+        if clean_val == '0' and sparse:
+            continue
+        f_template += f'({row_idx}, {col_idx}, {clean_val}), '
+    f_template += ')'
+    return f_template
+
+
 def time_symbolic_rates():
+    time_jit('tcs_rates_sp_lambda', refactor_to_lambda(TCS_RATES, (29, 1), True))
+    time_jit('tcs_rates_jac_sp_lambda', refactor_to_lambda(TCS_RATES_JACOBIAN, (29, 41), True))
+    time_jit('eq_rates_sp_lambda', refactor_to_lambda(EQUILIBRIUM_RATES, (37, 1), True))
+    time_jit('eq_rates_jac_sp_lambda', refactor_to_lambda(EQUILIBRIUM_RATES_JACOBIAN, (37, 104), True))
+    
     time_jit('tcs_rates_sp', tcs_rates_sp)
     time_jit('tcs_rates_jac_sp', tcs_rates_jac_sp)
     time_jit('eq_rates_sp', eq_rates_sp)
