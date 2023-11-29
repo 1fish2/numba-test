@@ -4,6 +4,9 @@ import timeit
 from numba import njit
 import numpy as np
 
+from refactored import tcs_rates, tcs_rates_jac, eq_rates, eq_rates_jac
+from refactored_sparse import tcs_rates_sp, tcs_rates_jac_sp, eq_rates_sp, eq_rates_jac_sp
+
 NUMBER = 10_000  # number of times for timeit to run the timed code
 
 # From WCM TwoComponentSystem.
@@ -303,7 +306,10 @@ def time_jit(function_name, function_code):
     kf = np.arange(100.0) * 2
     kr = np.arange(100.0) * 10
 
-    f = eval(function_code, {'np': np}, {})
+    if isinstance(function_code, str):
+        f = eval(function_code, {'np': np}, {})
+    else:
+        f = function_code
     f_jit = njit(f, error_model='numpy')
 
     time = timeit.timeit(lambda: f(t, y, kf, kr), number=NUMBER) / NUMBER
@@ -319,6 +325,16 @@ def time_jit(function_name, function_code):
 
 
 def time_symbolic_rates():
+    time_jit('tcs_rates_sp', tcs_rates_sp)
+    time_jit('tcs_rates_jac_sp', tcs_rates_jac_sp)
+    time_jit('eq_rates_sp', eq_rates_sp)
+    time_jit('eq_rates_jac_sp', eq_rates_jac_sp)
+
+    time_jit('tcs_rates', tcs_rates)
+    time_jit('tcs_rates_jac', tcs_rates_jac)
+    time_jit('eq_rates', eq_rates)
+    time_jit('eq_rates_jac', eq_rates_jac)
+
     time_jit('2CS RATES', TCS_RATES)
     time_jit('2CS RATES JACOBIAN', TCS_RATES_JACOBIAN)
     time_jit('EQUILIBRIUM RATES', EQUILIBRIUM_RATES)
