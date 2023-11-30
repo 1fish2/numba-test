@@ -1,8 +1,32 @@
+"""
+A program to measure how long it takes to run Numba's JIT compiler and how much
+it speeds up 4 matrix constructions. This is easily run on different Python
+versions.
+
+The matrices were generated using Sympy in a whole cell model of e coli, and
+snapshotted here as a small, standalone test.
+
+Notably, Numba's JIT compiler gets very slow on Python 3.10 and 3.11 -- over
+3 minutes to compile EQUILIBRIUM_RATES_JACOBIAN matrix on a 2018 Intel MBP.
+See observations.md for data and notes.
+
+This program also tests hypotheses for speeding up the matrix calculation:
+    * imperative assignments to array elements instead of np.array([elements...])
+    * sparse construction that omits the `= 0` assignments
+
+The output is Markdown-friendly with a "### " header and "  <EOL>" line breaks.
+"""
+
+# Enable segmentation and other fault handling for tracebacks
+import faulthandler
 import platform
 import timeit
 
 from numba import njit
 import numpy as np
+
+faulthandler.enable()
+
 
 NUMBER = 10_000  # number of times for timeit to run the timed code
 
@@ -329,10 +353,15 @@ def time_jit(function_name, function_code, execute=False):
     print(f"{function_name:27} {time * 1000.0} ms,"
           f" jitting {time_to_jit * 1000.0:,} ms,"
           f" jitted {time_jitted * 1000.0} ms,"
-          f" iterations to payoff {iterations_to_payoff:,.0f}")
+          f" iterations to payoff {iterations_to_payoff:,.0f}  ")
 
 
 def refactor_to_lambda(func_string, arr_dims, sparse=False):
+    """Refactor the lambda function string that uses np.array([elements...])
+    into a lambda function that does imperative assignments into an ndarray via
+    the builder() function.
+    For sparse array construction, optionally omit the `= 0` assignments.
+    """
     array_string = func_string[36:-19]
     arr_vals = array_string.split(',')
     f_template = f"lambda t, y, kf, kr: builder({arr_dims}, "
@@ -359,6 +388,10 @@ def refactor_to_lambda(func_string, arr_dims, sparse=False):
 
 
 def refactor_func_string(func_string, func_name, arr_dims, sparse=False):
+    """Refactor the lambda function string that uses np.array([elements...])
+    into a def function that does imperative assignments into an ndarray.
+    For sparse array construction, optionally omit the `= 0` assignments.
+    """
     array_string = func_string[36:-19]
     arr_vals = array_string.split(',')
     f_template = f"def {func_name}(t, y, kf, kr):\n\tarr = np.zeros({arr_dims})\n"
@@ -385,44 +418,44 @@ def refactor_func_string(func_string, func_name, arr_dims, sparse=False):
 
 
 def time_symbolic_rates():
-    time_jit('tcs_rates_sp', 
-        refactor_func_string(
-            TCS_RATES, 
-            'tcs_rates_sp', 
-            (29, 1), 
-            sparse=True), 
-        execute=True)
-    time_jit('tcs_rates_jac_sp', 
-        refactor_func_string(
-            TCS_RATES_JACOBIAN, 
-            'tcs_rates_jac_sp', 
-            (29, 41), 
-            sparse=True), 
-        execute=True)
-    time_jit('eq_rates_sp', 
-        refactor_func_string(
-            EQUILIBRIUM_RATES, 
-            'eq_rates_sp', 
-            (37, 1), 
-            sparse=True), 
-        execute=True)
-    time_jit('eq_rates_jac_sp', 
-        refactor_func_string(
-            EQUILIBRIUM_RATES_JACOBIAN, 
-            'eq_rates_jac_sp', 
-            (37, 104), 
-            sparse=True), 
-        execute=True)
-    
-    time_jit('tcs_rates_sp_lambda', refactor_to_lambda(TCS_RATES, (29, 1), True))
-    time_jit('tcs_rates_jac_sp_lambda', refactor_to_lambda(TCS_RATES_JACOBIAN, (29, 41), True))
-    time_jit('eq_rates_sp_lambda', refactor_to_lambda(EQUILIBRIUM_RATES, (37, 1), True))
-    time_jit('eq_rates_jac_sp_lambda', refactor_to_lambda(EQUILIBRIUM_RATES_JACOBIAN, (37, 104), True))
-
     time_jit('2CS RATES', TCS_RATES)
     time_jit('2CS RATES JACOBIAN', TCS_RATES_JACOBIAN)
     time_jit('EQUILIBRIUM RATES', EQUILIBRIUM_RATES)
     time_jit('EQUILIBRIUM RATES JACOBIAN', EQUILIBRIUM_RATES_JACOBIAN)
+
+    print()
+    time_jit('tcs_rates_def',
+        refactor_func_string(TCS_RATES, 'tcs_rates_def', (29, 1)),
+        execute=True)
+    time_jit('tcs_rates_jac_def',
+        refactor_func_string(TCS_RATES_JACOBIAN, 'tcs_rates_jac_def', (29, 41)),
+        execute=True)
+    time_jit('eq_rates_def',
+        refactor_func_string(EQUILIBRIUM_RATES, 'eq_rates_def', (37, 1)),
+        execute=True)
+    time_jit('eq_rates_jac_def',
+        refactor_func_string(EQUILIBRIUM_RATES_JACOBIAN, 'eq_rates_jac_def', (37, 104)),
+        execute=True)
+
+    print()
+    time_jit('tcs_rates_sp',
+        refactor_func_string(TCS_RATES, 'tcs_rates_sp', (29, 1), sparse=True),
+        execute=True)
+    time_jit('tcs_rates_jac_sp',
+        refactor_func_string(TCS_RATES_JACOBIAN, 'tcs_rates_jac_sp', (29, 41), sparse=True),
+        execute=True)
+    time_jit('eq_rates_sp',
+        refactor_func_string(EQUILIBRIUM_RATES, 'eq_rates_sp', (37, 1), sparse=True),
+        execute=True)
+    time_jit('eq_rates_jac_sp',
+        refactor_func_string(EQUILIBRIUM_RATES_JACOBIAN, 'eq_rates_jac_sp', (37, 104), sparse=True),
+        execute=True)
+
+    print()
+    time_jit('tcs_rates_sp_lambda', refactor_to_lambda(TCS_RATES, (29, 1), True))
+    time_jit('tcs_rates_jac_sp_lambda', refactor_to_lambda(TCS_RATES_JACOBIAN, (29, 41), True))
+    time_jit('eq_rates_sp_lambda', refactor_to_lambda(EQUILIBRIUM_RATES, (37, 1), True))
+    time_jit('eq_rates_jac_sp_lambda', refactor_to_lambda(EQUILIBRIUM_RATES_JACOBIAN, (37, 104), True))
 
 
 def environment():
@@ -430,5 +463,5 @@ def environment():
 
 
 if __name__ == '__main__':
-    print(f"Numba timings on {environment()}")
+    print(f"### Numba timings on {environment()}  ")
     time_symbolic_rates()
