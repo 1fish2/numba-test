@@ -6,7 +6,10 @@ A few observations:
 4. Before JIT compilation, running the non-sparsified `arr[i,j] = k` functions is faster than the `np.array([...])` lambdas for small arrays (non-Jacobians) but slower for large arrays (Jacobians).
 5. After JIT compilation, all `arr[i,j] = k` functions (both sparsified `_sp` and non-sparsified) run approximately 4x faster than their `np.array([...])` counterparts (the upper case names, below).
 6. There is some internal caching happening in Numba that makes it hard to accurately measure compilation time. For example, tcs_rates, tcs_rates_sp and 2CS RATES all compile in around 850 ms when run in their own Python 3.8 interpreters. However, in the timings above, tcs_rates and 2CS RATES finish compiling in about 550 ms each. Accounting for this, all sparsified `arr[i,j] = k` functions compile more quickly than their `np.array([...])` counterparts.
+7. `variable_size.py` measures JIT compiling a simplistic function with the given number(s) of array-assignment lines, to see how JIT compilation time grows with the size of the function. `pyinstrument -r html src/variable_size.py 300` shows a very deep call stack.
 
+
+## time_numba.py
 
 ### Numba timings on Python 3.8.13 on macOS-13.6-x86_64-i386-64bit  
 2CS RATES                   0.015978366999999993 ms, jitting 1,184.653908 ms, jitted 0.006510348099999996 ms, iterations to payoff 125,122  
@@ -94,3 +97,32 @@ tcs_rates_sp_lambda         0.07688086410053074 ms, jitting 737.6813619630411 ms
 tcs_rates_jac_sp_lambda     0.09333062359364704 ms, jitting 2,539.8723609978333 ms, jitted 0.0020686439936980603 ms, iterations to payoff 27,831  
 eq_rates_sp_lambda          0.08049982450902461 ms, jitting 1,900.499640032649 ms, jitted 0.0018513152026571333 ms, iterations to payoff 24,164  
 eq_rates_jac_sp_lambda      0.21978946550516412 ms, jitting 7,492.27405898273 ms, jitted 0.0025912325945682824 ms, iterations to payoff 34,495  
+
+
+## variable_size.py
+
+### Numba timing [10, 100, 500, 1000, 2000, 3000]-line function(s) on Python 3.9.0 on macOS-10.16-x86_64-i386-64bit  
+def_10                      0.0019491797000000144 ms, jitting 716.6221530000004 ms, jitted 0.001647332800000001 ms, iterations to payoff 2,374,125  
+def_100                     0.010613547099999997 ms, jitting 499.37439300000005 ms, jitted 0.001416736399999996 ms, iterations to payoff 54,299  
+def_500                     0.04901293630000003 ms, jitting 3,326.691319 ms, jitted 0.0016683238999999795 ms, iterations to payoff 70,265  
+def_1000                    0.09553360619999998 ms, jitting 9,292.245966 ms, jitted 0.0016655037999999678 ms, iterations to payoff 98,993  
+def_2000                    0.18524503309999998 ms, jitting 45,032.609218000005 ms, jitted 0.0016992966999993086 ms, iterations to payoff 245,348  
+def_3000                    0.2724408881999992 ms, jitting 127,556.499058 ms, jitted 0.0016192551999978377 ms, iterations to payoff 470,998  
+
+
+### Numba timing [10, 100, 500, 1000, 2000, 3000]-line function(s) on Python 3.10.9 on macOS-13.6-x86_64-i386-64bit  
+def_10                      0.0017620300000999122 ms, jitting 387.62870398932137 ms, jitted 0.0014390818992978895 ms, iterations to payoff 1,200,282  
+def_100                     0.009694297700480093 ms, jitting 424.19349699048325 ms, jitted 0.0011005583000951447 ms, iterations to payoff 49,361  
+def_500                     0.043954572999791705 ms, jitting 3,097.3046849976527 ms, jitted 0.001694037600827869 ms, iterations to payoff 73,291  
+def_1000                    0.0902545063989237 ms, jitting 8,913.019030995201 ms, jitted 0.0016688101997715421 ms, iterations to payoff 100,615  
+def_2000                    0.1939099900002475 ms, jitting 37,958.549946008134 ms, jitted 0.0016584815995884128 ms, iterations to payoff 197,442  
+def_3000                    0.26879456549941094 ms, jitting 107,593.97208099836 ms, jitted 0.0015970347987604326 ms, iterations to payoff 402,676  
+
+
+### Numba timing [10, 100, 500, 1000, 2000, 3000]-line function(s) on Python 3.11.6 on macOS-13.6-x86_64-i386-64bit  
+def_10                      0.0017137293994892388 ms, jitting 396.6961960104527 ms, jitted 0.0013411173000349664 ms, iterations to payoff 1,064,636  
+def_100                     0.01001632130064536 ms, jitting 348.66755800612736 ms, jitted 0.0011644861995591782 ms, iterations to payoff 39,389  
+def_500                     0.042999359600071334 ms, jitting 2,542.1669829956954 ms, jitted 0.0016060084002674556 ms, iterations to payoff 61,415  
+def_1000                    0.0985821123002097 ms, jitting 9,218.460219999542 ms, jitted 0.001664343698939774 ms, iterations to payoff 95,116  
+def_2000                    0.18032720049959608 ms, jitting 42,981.51225098991 ms, jitted 0.0016481407001265325 ms, iterations to payoff 240,551  
+def_3000                    0.28561890479904833 ms, jitting 121,136.09468299546 ms, jitted 0.0015539554005954415 ms, iterations to payoff 426,438  

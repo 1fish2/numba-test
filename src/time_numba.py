@@ -28,7 +28,7 @@ import numpy as np
 faulthandler.enable()
 
 
-NUMBER = 10_000  # number of times for timeit to run the timed code
+NUMBER = 10_000  # number of times for timeit to run the test function
 
 # From WCM TwoComponentSystem.
 TCS_RATES = """lambda t, y, kf, kr: np.array([ \
